@@ -146,6 +146,28 @@
             min-height: 28px;
             font-size: 1.1em;
         }
+        .difficulty-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+        .difficulty-select {
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 1em;
+        }
+        .result-tip {
+            color: #ffe066;
+            margin: 12px 0 0 0;
+            text-align: center;
+            min-height: 28px;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -164,8 +186,16 @@
             <option value="cello">大提琴</option>
         </select>
     </div>
+    <div class="difficulty-row">
+        <label id="difficultyLabel">难度</label>
+        <select id="difficultySelect" class="difficulty-select">
+            <option value="easy">简单</option>
+            <option value="hard">困难</option>
+        </select>
+    </div>
     <h1 id="mainTitle">音高识别闯关</h1>
     <div class="level-bar" id="levelBar">第 1 / 10 关</div>
+    <div class="result-tip" id="resultTip"></div>
     <div class="canvas-row">
         <div class="replay-hint-group">
             <button class="replay-btn" id="replayBtn">重听</button>
@@ -175,9 +205,9 @@
     </div>
     <div class="keyboard-row" id="keyboardRow"></div>
     <div class="volume-row"><span id="volumeLabel">音量</span><input type="range" id="volumeSlider" min="0" max="100" value="80"><span id="volumeValue">80%</span></div>
+    <div class="tip" id="tip"></div>
     <button class="start-btn" id="startBtn">开始</button>
     <button class="next-btn" id="nextBtn" style="display:none;">下一关</button>
-    <div class="tip" id="tip"></div>
     <script>
     // 多语言
     const LANGS = {
@@ -186,9 +216,9 @@
             instrument: "乐器",
             start: "开始",
             next: "下一关",
-            tip: "请听音后选择正确的音符",
+            tip: "1-4关：听单音辨位\n5-8关：双音组合挑战\n9-10关：终极和弦试炼",
             correct: "答对了！",
-            wrong: "答错了，已回到第1关",
+            wrong: "答错了，请再试一次",
             pass: "恭喜通关！",
             replay: "重听",
             hint: "提示",
@@ -202,9 +232,9 @@
             instrument: "Instrument",
             start: "Start",
             next: "Next",
-            tip: "Listen and choose the correct note",
+            tip: "Level 1-4: Single note recognition\n5-8: Double note challenge\n9-10: Ultimate chord trial",
             correct: "Correct!",
-            wrong: "Wrong, back to level 1",
+            wrong: "Wrong, try again",
             pass: "Congratulations! All levels cleared!",
             replay: "Replay",
             hint: "Hint",
@@ -218,9 +248,9 @@
             instrument: "Instrument",
             start: "Start",
             next: "Neste",
-            tip: "Lytt og velg riktig tone",
+            tip: "1-4: Lytt til enkelttone\n5-8: Dobbelttone-utfordring\n9-10: Ultimat akkordprøve",
             correct: "Riktig!",
-            wrong: "Feil, tilbake til nivå 1",
+            wrong: "Feil, prøv igjen",
             pass: "Gratulerer! Alle nivåer fullført!",
             replay: "Spill igjen",
             hint: "Hint",
@@ -234,9 +264,9 @@
             instrument: "악기",
             start: "시작",
             next: "다음",
-            tip: "소리를 듣고 올바른 음을 선택하세요",
+            tip: "1-4: 단음 구분\n5-8: 이음 조합 도전\n9-10: 궁극의 화음 시험",
             correct: "정답!",
-            wrong: "오답, 1단계로 돌아갑니다",
+            wrong: "오답, 다시 시도하세요",
             pass: "축하합니다! 모든 레벨을 완료했습니다!",
             replay: "다시 듣기",
             hint: "힌트",
@@ -284,6 +314,11 @@
     const volumeSlider = document.getElementById('volumeSlider');
     const volumeValue = document.getElementById('volumeValue');
     const volumeLabel = document.getElementById('volumeLabel');
+    const difficultySelect = document.getElementById('difficultySelect');
+    const difficultyLabel = document.getElementById('difficultyLabel');
+    const resultTip = document.getElementById('resultTip');
+    // 难度状态
+    let difficulty = 'easy';
     // 初始化UI
     function setLangUI(lang) {
         const L = LANGS[lang];
@@ -293,13 +328,20 @@
         nextBtn.textContent = L.next;
         replayBtn.textContent = L.replay;
         hintBtn.textContent = L.hint;
-        tip.textContent = L.tip;
+        setTimeout(() => {
+            tip.innerHTML = (L.tip || '').replace(/\n/g, '<br>');
+        }, 0);
+        resultTip.textContent = '';
         levelBar.textContent = L.level(currentLevel);
         keyboardRow.innerHTML = '';
         volumeLabel.textContent = lang === 'en' ? 'Volume' : lang === 'no' ? 'Volum' : lang === 'ko' ? '볼륨' : '音量';
         for (let i = 0; i < instrumentSelect.options.length; i++) {
             instrumentSelect.options[i].textContent = L.instruments[i];
         }
+        // 难度多语言
+        difficultyLabel.textContent = lang === 'en' ? 'Difficulty' : lang === 'no' ? 'Vanskelighetsgrad' : lang === 'ko' ? '난이도' : '难度';
+        difficultySelect.options[0].textContent = lang === 'en' ? 'Easy' : lang === 'no' ? 'Lett' : lang === 'ko' ? '쉬움' : '简单';
+        difficultySelect.options[1].textContent = lang === 'en' ? 'Hard' : lang === 'no' ? 'Vanskelig' : lang === 'ko' ? '어려움' : '困难';
         for (let i = 0; i < 8; i++) {
             const btn = document.createElement('button');
             btn.className = 'key-label';
@@ -320,6 +362,9 @@
     });
     instrumentSelect.addEventListener('change', e => {
         instrument = instrumentSelect.value;
+    });
+    difficultySelect.addEventListener('change', e => {
+        difficulty = difficultySelect.value;
     });
     setLangUI(currentLang);
     // 默认音量
@@ -347,39 +392,55 @@
                 answerIdx2 = Math.floor(Math.random() * 8);
             } while (answerIdx2 === answerIdx);
             setTimeout(() => {
-                playChord(answerIdx, answerIdx2);
-                // 不触发动画
-                canAnswer = true;
+                // 先依次播放两个音
+                playNote(answerIdx);
+                setTimeout(() => {
+                    playNote(answerIdx2);
+                    // 再同时播放和弦
+                    setTimeout(() => {
+                        playChord(answerIdx, answerIdx2);
+                        canAnswer = true;
+                    }, 500);
+                }, 500);
             }, 600);
         }
     }
     function handleAnswer(idx, triggerAnim) {
         if (!canAnswer) return;
         if (currentLevel < 5) {
-            canAnswer = false;
             if (triggerAnim) {
                 startHighlightAnim(idx);
                 setTimeout(() => stopHighlightAnim(idx), 900);
             }
             if (idx === answerIdx) {
+                canAnswer = false;
                 document.getElementById('keyLabel_' + idx).classList.add('correct');
-                tip.textContent = LANGS[currentLang].correct;
+                resultTip.textContent = LANGS[currentLang].correct;
                 if (currentLevel < 10) {
                     nextBtn.style.display = '';
                 } else {
-                    tip.textContent = LANGS[currentLang].pass;
+                    resultTip.textContent = LANGS[currentLang].pass;
                     startBtn.style.display = '';
                 }
             } else {
                 document.getElementById('keyLabel_' + idx).classList.add('wrong');
-                tip.textContent = LANGS[currentLang].wrong;
-                setTimeout(() => {
-                    document.getElementById('keyLabel_' + idx).classList.remove('wrong');
-                    currentLevel = 1;
-                    setLangUI(currentLang);
-                    startBtn.style.display = '';
-                    nextBtn.style.display = 'none';
-                }, 900);
+                resultTip.textContent = LANGS[currentLang].wrong;
+                if (difficulty === 'hard') {
+                    canAnswer = false;
+                    setTimeout(() => {
+                        document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                        currentLevel = 1;
+                        setLangUI(currentLang);
+                        startBtn.style.display = '';
+                        nextBtn.style.display = 'none';
+                    }, 900);
+                } else {
+                    // easy模式可重选
+                    setTimeout(() => {
+                        document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                        canAnswer = true;
+                    }, 900);
+                }
             }
         } else {
             // 5关及以后，需点对两个
@@ -392,25 +453,33 @@
                 answeredSet.add(idx);
                 if (answeredSet.size === 2) {
                     canAnswer = false;
-                    tip.textContent = LANGS[currentLang].correct;
+                    resultTip.textContent = LANGS[currentLang].correct;
                     if (currentLevel < 10) {
                         nextBtn.style.display = '';
                     } else {
-                        tip.textContent = LANGS[currentLang].pass;
+                        resultTip.textContent = LANGS[currentLang].pass;
                         startBtn.style.display = '';
                     }
                 }
             } else {
-                canAnswer = false;
                 document.getElementById('keyLabel_' + idx).classList.add('wrong');
-                tip.textContent = LANGS[currentLang].wrong;
-                setTimeout(() => {
-                    document.getElementById('keyLabel_' + idx).classList.remove('wrong');
-                    currentLevel = 1;
-                    setLangUI(currentLang);
-                    startBtn.style.display = '';
-                    nextBtn.style.display = 'none';
-                }, 900);
+                resultTip.textContent = LANGS[currentLang].wrong;
+                if (difficulty === 'hard') {
+                    canAnswer = false;
+                    setTimeout(() => {
+                        document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                        currentLevel = 1;
+                        setLangUI(currentLang);
+                        startBtn.style.display = '';
+                        nextBtn.style.display = 'none';
+                    }, 900);
+                } else {
+                    // easy模式可重选
+                    setTimeout(() => {
+                        document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                        canAnswer = true;
+                    }, 900);
+                }
             }
         }
     }
@@ -428,7 +497,21 @@
         startLevel();
     };
     replayBtn.onclick = () => {
-        playNote(answerIdx);
+        if (currentLevel < 5) {
+            playNote(answerIdx);
+        } else if (currentLevel < 9) {
+            // 5~8关：先依次播放两个音，再和弦
+            playNote(answerIdx);
+            setTimeout(() => {
+                playNote(answerIdx2);
+                setTimeout(() => {
+                    playChord(answerIdx, answerIdx2);
+                }, 500);
+            }, 500);
+        } else {
+            // 9~10关：只播放和弦
+            playChord(answerIdx, answerIdx2);
+        }
         // 不触发动画
     };
     hintBtn.onclick = async () => {
