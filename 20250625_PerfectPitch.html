@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PerfectPitch Mode</title>
+    <style>
+        body {
+            margin: 0;
+            background: #222;
+            color: #fff;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .top-bar {
+            margin-top: 32px;
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+        .lang-select, .instrument-select {
+            background: #444;
+            color: #fff;
+            border: none;
+            border-radius: 6px;
+            padding: 6px 14px;
+            font-size: 1em;
+        }
+        h1 { margin: 18px 0 18px 0; }
+        .level-bar {
+            margin: 10px 0 18px 0;
+            font-size: 1.1em;
+            letter-spacing: 2px;
+        }
+        .canvas-row {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 18px;
+            justify-content: center;
+        }
+        #musicCanvas {
+            background: #111;
+            border-radius: 10px;
+            box-shadow: 0 4px 24px #0005;
+            margin-bottom: 10px;
+            display: block;
+        }
+        .keyboard-row {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            width: 320px;
+            max-width: 320px;
+            margin: 0 auto 18px auto;
+            gap: 0;
+            justify-items: center;
+        }
+        .key-label {
+            background: #333;
+            color: #fff;
+            border-radius: 6px;
+            padding: 10px 0 6px 0;
+            font-size: 1.2em;
+            min-width: 40px;
+            width: 40px;
+            max-width: 40px;
+            text-align: center;
+            user-select: none;
+            transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            border: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .key-label .note-text {
+            font-size: 0.85em;
+            opacity: 0.85;
+            margin-top: 2px;
+        }
+        .key-label.active, .key-label:active {
+            background: linear-gradient(90deg, #3b82f6 0%, #a7f3d0 100%);
+            color: #fff;
+            box-shadow: 0 0 0 3px #3b82f6cc;
+            font-weight: bold;
+        }
+        .key-label.correct {
+            background: linear-gradient(90deg, #22d3ee 0%, #fef9c3 100%);
+            color: #111;
+            box-shadow: 0 0 0 3px #22d3ee99;
+        }
+        .key-label.wrong {
+            background: #f87171;
+            color: #fff;
+            box-shadow: 0 0 0 3px #f8717199;
+        }
+        .start-btn, .next-btn, .replay-btn, .hint-btn {
+            background: #ffe066;
+            color: #222;
+            border: none;
+            border-radius: 6px;
+            padding: 10px 32px;
+            font-size: 1.1em;
+            font-weight: bold;
+            margin: 18px 0 0 0;
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s;
+        }
+        .start-btn:hover, .next-btn:hover, .replay-btn:hover, .hint-btn:hover {
+            background: #ffd60a;
+        }
+        .replay-btn, .hint-btn {
+            padding: 8px 18px;
+            font-size: 1em;
+            margin: 0 6px 10px 6px;
+            display: inline-block;
+        }
+        .canvas-row .replay-btn, .canvas-row .hint-btn {
+            margin-top: 0;
+        }
+        .canvas-row .replay-hint-group {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+        }
+        .volume-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+            color: #ffe066;
+            font-size: 1em;
+        }
+        .volume-row input[type=range] {
+            width: 100px;
+        }
+        .tip {
+            color: #ffe066;
+            margin: 12px 0 0 0;
+            text-align: center;
+            min-height: 28px;
+            font-size: 1.1em;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <select class="lang-select" id="langSelect">
+            <option value="zh">中文</option>
+            <option value="en">English</option>
+            <option value="no">Norsk</option>
+            <option value="ko">한국어</option>
+        </select>
+        <label id="instrumentLabel">乐器</label>
+        <select id="instrumentSelect" class="instrument-select">
+            <option value="piano">钢琴</option>
+            <option value="guitar">吉他</option>
+            <option value="flute">长笛</option>
+            <option value="cello">大提琴</option>
+        </select>
+    </div>
+    <h1 id="mainTitle">音高识别闯关</h1>
+    <div class="level-bar" id="levelBar">第 1 / 10 关</div>
+    <div class="canvas-row">
+        <div class="replay-hint-group">
+            <button class="replay-btn" id="replayBtn">重听</button>
+            <button class="hint-btn" id="hintBtn">提示</button>
+        </div>
+        <canvas id="musicCanvas" width="320" height="320"></canvas>
+        <div class="volume-row"><span id="volumeLabel">音量</span><input type="range" id="volumeSlider" min="0" max="100" value="80"><span id="volumeValue">80%</span></div>
+    </div>
+    <div class="keyboard-row" id="keyboardRow"></div>
+    <button class="start-btn" id="startBtn">开始</button>
+    <button class="next-btn" id="nextBtn" style="display:none;">下一关</button>
+    <div class="tip" id="tip"></div>
+    <script>
+    // 多语言
+    const LANGS = {
+        zh: {
+            title: "音高识别闯关",
+            instrument: "乐器",
+            start: "开始",
+            next: "下一关",
+            tip: "请听音后选择正确的音符",
+            correct: "答对了！",
+            wrong: "答错了，已回到第1关",
+            pass: "恭喜通关！",
+            replay: "重听",
+            hint: "提示",
+            level: l => `第 ${l} / 10 关`,
+            notes: ["哆", "来", "咪", "发", "嗦", "拉", "西", "哆'"],
+            keys: ["A", "S", "D", "F", "G", "H", "J", "K"],
+            instruments: ["钢琴", "吉他", "长笛", "大提琴"]
+        },
+        en: {
+            title: "PerfectPitch Challenge",
+            instrument: "Instrument",
+            start: "Start",
+            next: "Next",
+            tip: "Listen and choose the correct note",
+            correct: "Correct!",
+            wrong: "Wrong, back to level 1",
+            pass: "Congratulations! All levels cleared!",
+            replay: "Replay",
+            hint: "Hint",
+            level: l => `Level ${l} / 10`,
+            notes: ["Do", "Re", "Mi", "Fa", "So", "La", "Si", "Do'"],
+            keys: ["A", "S", "D", "F", "G", "H", "J", "K"],
+            instruments: ["Piano", "Guitar", "Flute", "Cello"]
+        },
+        no: {
+            title: "PerfektPitch Utfordring",
+            instrument: "Instrument",
+            start: "Start",
+            next: "Neste",
+            tip: "Lytt og velg riktig tone",
+            correct: "Riktig!",
+            wrong: "Feil, tilbake til nivå 1",
+            pass: "Gratulerer! Alle nivåer fullført!",
+            replay: "Spill igjen",
+            hint: "Hint",
+            level: l => `Nivå ${l} / 10`,
+            notes: ["Do", "Re", "Mi", "Fa", "So", "La", "Si", "Do'"],
+            keys: ["A", "S", "D", "F", "G", "H", "J", "K"],
+            instruments: ["Piano", "Gitar", "Fløyte", "Cello"]
+        },
+        ko: {
+            title: "퍼펙트피치 챌린지",
+            instrument: "악기",
+            start: "시작",
+            next: "다음",
+            tip: "소리를 듣고 올바른 음을 선택하세요",
+            correct: "정답!",
+            wrong: "오답, 1단계로 돌아갑니다",
+            pass: "축하합니다! 모든 레벨을 완료했습니다!",
+            replay: "다시 듣기",
+            hint: "힌트",
+            level: l => `레벨 ${l} / 10`,
+            notes: ["도", "레", "미", "파", "솔", "라", "시", "도'"],
+            keys: ["A", "S", "D", "F", "G", "H", "J", "K"],
+            instruments: ["피아노", "기타", "플루트", "첼로"]
+        }
+    };
+    let currentLang = 'zh';
+    // 音频参数
+    const NOTE_FREQS = [261.63, 293.66, 329.63, 349.23, 392.00, 440.00, 493.88, 523.25];
+    let audioCtx = null;
+    // 状态
+    let currentLevel = 1;
+    let answerIdx = 0;
+    let answerIdx2 = null;
+    let answeredSet = new Set();
+    let canAnswer = false;
+    let instrument = 'piano';
+    // 动画状态
+    const gridSize = 8;
+    const canvas = document.getElementById('musicCanvas');
+    const ctx = canvas.getContext('2d');
+    let highlightCol = -1;
+    let highlightAnim = 0;
+    let animating = false;
+    // 提示按钮播放状态
+    let hintPlaying = false;
+    // DOM
+    const langSelect = document.getElementById('langSelect');
+    const mainTitle = document.getElementById('mainTitle');
+    const instrumentLabel = document.getElementById('instrumentLabel');
+    const instrumentSelect = document.getElementById('instrumentSelect');
+    const levelBar = document.getElementById('levelBar');
+    const keyboardRow = document.getElementById('keyboardRow');
+    const startBtn = document.getElementById('startBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const tip = document.getElementById('tip');
+    const replayBtn = document.getElementById('replayBtn');
+    const hintBtn = document.getElementById('hintBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const volumeValue = document.getElementById('volumeValue');
+    const volumeLabel = document.getElementById('volumeLabel');
+    // 初始化UI
+    function setLangUI(lang) {
+        const L = LANGS[lang];
+        mainTitle.textContent = L.title;
+        instrumentLabel.textContent = L.instrument;
+        startBtn.textContent = L.start;
+        nextBtn.textContent = L.next;
+        replayBtn.textContent = L.replay;
+        hintBtn.textContent = L.hint;
+        tip.textContent = L.tip;
+        levelBar.textContent = L.level(currentLevel);
+        keyboardRow.innerHTML = '';
+        volumeLabel.textContent = lang === 'en' ? 'Volume' : lang === 'no' ? 'Volum' : lang === 'ko' ? '볼륨' : '音量';
+        for (let i = 0; i < instrumentSelect.options.length; i++) {
+            instrumentSelect.options[i].textContent = L.instruments[i];
+        }
+        for (let i = 0; i < 8; i++) {
+            const btn = document.createElement('button');
+            btn.className = 'key-label';
+            btn.id = 'keyLabel_' + i;
+            btn.innerHTML = `<div>${L.keys[i]}</div><div class="note-text">${L.notes[i]}</div>`;
+            btn.onclick = () => handleAnswer(i, true);
+            keyboardRow.appendChild(btn);
+        }
+    }
+    langSelect.addEventListener('change', e => {
+        currentLang = e.target.value;
+        setLangUI(currentLang);
+        // 乐器多语言
+        const L = LANGS[currentLang];
+        for (let i = 0; i < instrumentSelect.options.length; i++) {
+            instrumentSelect.options[i].textContent = L.instruments[i];
+        }
+    });
+    instrumentSelect.addEventListener('change', e => {
+        instrument = instrumentSelect.value;
+    });
+    setLangUI(currentLang);
+    // 默认音量
+    let globalVolume = 0.8;
+    // 关卡流程
+    function startLevel() {
+        canAnswer = false;
+        tip.textContent = LANGS[currentLang].tip;
+        for (let i = 0; i < 8; i++) {
+            document.getElementById('keyLabel_' + i).className = 'key-label';
+        }
+        answeredSet.clear();
+        if (currentLevel < 5) {
+            answerIdx = Math.floor(Math.random() * 8);
+            answerIdx2 = null;
+            setTimeout(() => {
+                playNote(answerIdx);
+                // 不触发动画
+                canAnswer = true;
+            }, 600);
+        } else {
+            // 5关及以后，随机两个不同音
+            answerIdx = Math.floor(Math.random() * 8);
+            do {
+                answerIdx2 = Math.floor(Math.random() * 8);
+            } while (answerIdx2 === answerIdx);
+            setTimeout(() => {
+                playChord(answerIdx, answerIdx2);
+                // 不触发动画
+                canAnswer = true;
+            }, 600);
+        }
+    }
+    function handleAnswer(idx, triggerAnim) {
+        if (!canAnswer) return;
+        if (currentLevel < 5) {
+            canAnswer = false;
+            if (triggerAnim) startHighlightAnim(idx);
+            if (idx === answerIdx) {
+                document.getElementById('keyLabel_' + idx).classList.add('correct');
+                tip.textContent = LANGS[currentLang].correct;
+                if (currentLevel < 10) {
+                    nextBtn.style.display = '';
+                } else {
+                    tip.textContent = LANGS[currentLang].pass;
+                    startBtn.style.display = '';
+                }
+            } else {
+                document.getElementById('keyLabel_' + idx).classList.add('wrong');
+                tip.textContent = LANGS[currentLang].wrong;
+                setTimeout(() => {
+                    document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                    currentLevel = 1;
+                    setLangUI(currentLang);
+                    startBtn.style.display = '';
+                    nextBtn.style.display = 'none';
+                }, 900);
+            }
+        } else {
+            // 5关及以后，需点对两个
+            if (triggerAnim) startHighlightAnim(idx);
+            if ((idx === answerIdx || idx === answerIdx2) && !answeredSet.has(idx)) {
+                document.getElementById('keyLabel_' + idx).classList.add('correct');
+                answeredSet.add(idx);
+                if (answeredSet.size === 2) {
+                    canAnswer = false;
+                    tip.textContent = LANGS[currentLang].correct;
+                    if (currentLevel < 10) {
+                        nextBtn.style.display = '';
+                    } else {
+                        tip.textContent = LANGS[currentLang].pass;
+                        startBtn.style.display = '';
+                    }
+                }
+            } else {
+                canAnswer = false;
+                document.getElementById('keyLabel_' + idx).classList.add('wrong');
+                tip.textContent = LANGS[currentLang].wrong;
+                setTimeout(() => {
+                    document.getElementById('keyLabel_' + idx).classList.remove('wrong');
+                    currentLevel = 1;
+                    setLangUI(currentLang);
+                    startBtn.style.display = '';
+                    nextBtn.style.display = 'none';
+                }, 900);
+            }
+        }
+    }
+    startBtn.onclick = () => {
+        currentLevel = 1;
+        setLangUI(currentLang);
+        startBtn.style.display = 'none';
+        nextBtn.style.display = 'none';
+        startLevel();
+    };
+    nextBtn.onclick = () => {
+        currentLevel++;
+        setLangUI(currentLang);
+        nextBtn.style.display = 'none';
+        startLevel();
+    };
+    replayBtn.onclick = () => {
+        playNote(answerIdx);
+        // 不触发动画
+    };
+    hintBtn.onclick = async () => {
+        if (hintPlaying) return;
+        hintPlaying = true;
+        for (let i = 0; i < 8; i++) {
+            playNote(i);
+            startHighlightAnim(i);
+            await new Promise(res => setTimeout(res, 500));
+        }
+        hintPlaying = false;
+    };
+    // 键盘支持
+    document.addEventListener('keydown', e => {
+        if (!canAnswer) return;
+        const L = LANGS[currentLang];
+        const idx = L.keys.findIndex(k => k === e.key.toUpperCase());
+        if (idx !== -1) {
+            handleAnswer(idx, true);
+        }
+    });
+    // 动画绘制
+    function drawGrid() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        for (let x = 0; x < gridSize; x++) {
+            for (let y = 0; y < gridSize; y++) {
+                let highlight = false;
+                if (Array.isArray(highlightCol)) {
+                    highlight = highlightCol.includes(x) && animating;
+                } else {
+                    highlight = (x === highlightCol && animating);
+                }
+                if (highlight) {
+                    let t = (Math.sin(highlightAnim + y*0.3) * 0.5 + 0.5);
+                    let color1 = [59,130,246];
+                    let color2 = [255,255,255];
+                    let r = Math.round(color1[0] + (color2[0]-color1[0])*t);
+                    let g = Math.round(color1[1] + (color2[1]-color1[1])*t);
+                    let b = Math.round(color1[2] + (color2[2]-color1[2])*t);
+                    ctx.fillStyle = `rgb(${r},${g},${b})`;
+                } else {
+                    ctx.fillStyle = '#222';
+                }
+                ctx.fillRect(x*40+4, y*40+4, 32, 32);
+            }
+        }
+    }
+    function startHighlightAnim(col) {
+        highlightCol = col;
+        highlightAnim = 0;
+        animating = true;
+        setTimeout(()=>{ animating = false; highlightCol = -1; }, 1200);
+    }
+    function animate() {
+        if (animating) highlightAnim += 0.12;
+        drawGrid();
+        requestAnimationFrame(animate);
+    }
+    animate();
+    // 音频播放
+    function playNote(idx) {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        let freq = NOTE_FREQS[idx];
+        let type = 'sine', attack = 0.01, decay = 0.18;
+        switch (instrument) {
+            case 'piano': type = 'sine'; attack = 0.01; decay = 0.18; break;
+            case 'guitar': type = 'triangle'; attack = 0.01; decay = 0.22; break;
+            case 'flute': type = 'sine'; attack = 0.08; decay = 0.28; break;
+            case 'cello': type = 'sawtooth'; attack = 0.12; decay = 0.36; break;
+        }
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.value = 0.0;
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start();
+        gain.gain.linearRampToValueAtTime(0.5 * globalVolume, audioCtx.currentTime + attack);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + attack + decay);
+        setTimeout(() => {
+            osc.stop();
+            osc.disconnect();
+            gain.disconnect();
+        }, (attack + decay) * 1000 + 80);
+    }
+    // 和弦播放
+    function playChord(idx1, idx2) {
+        playNote(idx1);
+        setTimeout(() => playNote(idx2), 0);
+    }
+    // 音量调节
+    volumeSlider.addEventListener('input', () => {
+        globalVolume = parseInt(volumeSlider.value) / 100;
+        volumeValue.textContent = volumeSlider.value + '%';
+    });
+    </script>
+</body>
+</html> 
