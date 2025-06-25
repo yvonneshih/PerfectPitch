@@ -83,9 +83,9 @@
             margin-top: 2px;
         }
         .key-label.active, .key-label:active {
-            background: linear-gradient(90deg, #3b82f6 0%, #a7f3d0 100%);
-            color: #fff;
-            box-shadow: 0 0 0 3px #3b82f6cc;
+            background: #ffe066;
+            color: #222;
+            box-shadow: 0 0 0 3px #ffe066cc;
             font-weight: bold;
         }
         .key-label.correct {
@@ -172,9 +172,9 @@
             <button class="hint-btn" id="hintBtn">提示</button>
         </div>
         <canvas id="musicCanvas" width="320" height="320"></canvas>
-        <div class="volume-row"><span id="volumeLabel">音量</span><input type="range" id="volumeSlider" min="0" max="100" value="80"><span id="volumeValue">80%</span></div>
     </div>
     <div class="keyboard-row" id="keyboardRow"></div>
+    <div class="volume-row"><span id="volumeLabel">音量</span><input type="range" id="volumeSlider" min="0" max="100" value="80"><span id="volumeValue">80%</span></div>
     <button class="start-btn" id="startBtn">开始</button>
     <button class="next-btn" id="nextBtn" style="display:none;">下一关</button>
     <div class="tip" id="tip"></div>
@@ -264,6 +264,9 @@
     let highlightCol = -1;
     let highlightAnim = 0;
     let animating = false;
+    let barGrow = Array(8).fill(0); // 0~1, 每列动画进度
+    let barActive = Array(8).fill(false);
+    let barAnimCols = [];
     // 提示按钮播放状态
     let hintPlaying = false;
     // DOM
@@ -354,7 +357,10 @@
         if (!canAnswer) return;
         if (currentLevel < 5) {
             canAnswer = false;
-            if (triggerAnim) startHighlightAnim(idx);
+            if (triggerAnim) {
+                startHighlightAnim(idx);
+                setTimeout(() => stopHighlightAnim(idx), 900);
+            }
             if (idx === answerIdx) {
                 document.getElementById('keyLabel_' + idx).classList.add('correct');
                 tip.textContent = LANGS[currentLang].correct;
@@ -377,7 +383,10 @@
             }
         } else {
             // 5关及以后，需点对两个
-            if (triggerAnim) startHighlightAnim(idx);
+            if (triggerAnim) {
+                startHighlightAnim(idx);
+                setTimeout(() => stopHighlightAnim(idx), 900);
+            }
             if ((idx === answerIdx || idx === answerIdx2) && !answeredSet.has(idx)) {
                 document.getElementById('keyLabel_' + idx).classList.add('correct');
                 answeredSet.add(idx);
@@ -428,6 +437,7 @@
         for (let i = 0; i < 8; i++) {
             playNote(i);
             startHighlightAnim(i);
+            setTimeout(() => stopHighlightAnim(i), 400);
             await new Promise(res => setTimeout(res, 500));
         }
         hintPlaying = false;
@@ -445,14 +455,11 @@
     function drawGrid() {
         ctx.clearRect(0,0,canvas.width,canvas.height);
         for (let x = 0; x < gridSize; x++) {
+            let grow = barGrow[x] || 0;
+            let h = Math.round(grow * gridSize);
             for (let y = 0; y < gridSize; y++) {
-                let highlight = false;
-                if (Array.isArray(highlightCol)) {
-                    highlight = highlightCol.includes(x) && animating;
-                } else {
-                    highlight = (x === highlightCol && animating);
-                }
-                if (highlight) {
+                if (y >= gridSize - h) {
+                    // 动态渐变色
                     let t = (Math.sin(highlightAnim + y*0.3) * 0.5 + 0.5);
                     let color1 = [59,130,246];
                     let color2 = [255,255,255];
@@ -468,13 +475,32 @@
         }
     }
     function startHighlightAnim(col) {
-        highlightCol = col;
-        highlightAnim = 0;
-        animating = true;
-        setTimeout(()=>{ animating = false; highlightCol = -1; }, 1200);
+        // 支持单列或多列
+        let cols = Array.isArray(col) ? col : [col];
+        barAnimCols = cols;
+        for (let i = 0; i < 8; i++) {
+            if (cols.includes(i)) {
+                barActive[i] = true;
+            }
+        }
+    }
+    function stopHighlightAnim(col) {
+        let cols = Array.isArray(col) ? col : [col];
+        for (let i = 0; i < 8; i++) {
+            if (cols.includes(i)) {
+                barActive[i] = false;
+            }
+        }
     }
     function animate() {
-        if (animating) highlightAnim += 0.12;
+        highlightAnim += 0.12;
+        for (let i = 0; i < 8; i++) {
+            if (barActive[i]) {
+                barGrow[i] = Math.min(1, barGrow[i] + 0.12);
+            } else {
+                barGrow[i] = Math.max(0, barGrow[i] - 0.10);
+            }
+        }
         drawGrid();
         requestAnimationFrame(animate);
     }
@@ -497,7 +523,8 @@
         gain.gain.value = 0.0;
         osc.connect(gain).connect(audioCtx.destination);
         osc.start();
-        gain.gain.linearRampToValueAtTime(0.5 * globalVolume, audioCtx.currentTime + attack);
+        // 音量线性映射，最大为1.0
+        gain.gain.linearRampToValueAtTime(globalVolume, audioCtx.currentTime + attack);
         gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + attack + decay);
         setTimeout(() => {
             osc.stop();
@@ -508,7 +535,7 @@
     // 和弦播放
     function playChord(idx1, idx2) {
         playNote(idx1);
-        setTimeout(() => playNote(idx2), 0);
+        playNote(idx2);
     }
     // 音量调节
     volumeSlider.addEventListener('input', () => {
