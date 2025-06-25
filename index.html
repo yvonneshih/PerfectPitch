@@ -31,7 +31,7 @@
         }
         h1 { margin: 18px 0 18px 0; }
         .level-bar {
-            margin: 10px 0 18px 0;
+            margin: 8px 0 4px 0;
             font-size: 1.1em;
             letter-spacing: 2px;
         }
@@ -39,8 +39,8 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-bottom: 18px;
-            justify-content: center;
+            margin-bottom: 8px;
+            margin-top: 0;
         }
         #musicCanvas {
             background: #111;
@@ -89,9 +89,9 @@
             font-weight: bold;
         }
         .key-label.correct {
-            background: linear-gradient(90deg, #22d3ee 0%, #fef9c3 100%);
-            color: #111;
-            box-shadow: 0 0 0 3px #22d3ee99;
+            background: #339933;
+            color: #fff;
+            box-shadow: 0 0 0 3px #339933cc;
         }
         .key-label.wrong {
             background: #f87171;
@@ -162,9 +162,9 @@
         }
         .result-tip {
             color: #ffe066;
-            margin: 12px 0 0 0;
+            margin: 6px 0 0 0;
             text-align: center;
-            min-height: 28px;
+            min-height: 24px;
             font-size: 1.1em;
             font-weight: bold;
         }
@@ -385,23 +385,28 @@
                 // 不触发动画
                 canAnswer = true;
             }, 600);
-        } else {
-            // 5关及以后，随机两个不同音
+        } else if (currentLevel < 9) {
+            // 5~8关，依次播放两个音
             answerIdx = Math.floor(Math.random() * 8);
             do {
                 answerIdx2 = Math.floor(Math.random() * 8);
             } while (answerIdx2 === answerIdx);
             setTimeout(() => {
-                // 先依次播放两个音
                 playNote(answerIdx);
                 setTimeout(() => {
                     playNote(answerIdx2);
-                    // 再同时播放和弦
-                    setTimeout(() => {
-                        playChord(answerIdx, answerIdx2);
-                        canAnswer = true;
-                    }, 500);
+                    canAnswer = true;
                 }, 500);
+            }, 600);
+        } else {
+            // 9~10关，和弦
+            answerIdx = Math.floor(Math.random() * 8);
+            do {
+                answerIdx2 = Math.floor(Math.random() * 8);
+            } while (answerIdx2 === answerIdx);
+            setTimeout(() => {
+                playChord(answerIdx, answerIdx2);
+                canAnswer = true;
             }, 600);
         }
     }
@@ -500,16 +505,11 @@
         if (currentLevel < 5) {
             playNote(answerIdx);
         } else if (currentLevel < 9) {
-            // 5~8关：先依次播放两个音，再和弦
             playNote(answerIdx);
             setTimeout(() => {
                 playNote(answerIdx2);
-                setTimeout(() => {
-                    playChord(answerIdx, answerIdx2);
-                }, 500);
             }, 500);
         } else {
-            // 9~10关：只播放和弦
             playChord(answerIdx, answerIdx2);
         }
         // 不触发动画
