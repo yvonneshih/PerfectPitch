@@ -348,6 +348,7 @@
             btn.id = 'keyLabel_' + i;
             btn.innerHTML = `<div>${L.keys[i]}</div><div class="note-text">${L.notes[i]}</div>`;
             btn.onclick = () => handleAnswer(i, true);
+            btn.addEventListener('mousedown', () => playNote(i));
             keyboardRow.appendChild(btn);
         }
     }
@@ -527,11 +528,13 @@
     };
     // 键盘支持
     document.addEventListener('keydown', e => {
-        if (!canAnswer) return;
         const L = LANGS[currentLang];
         const idx = L.keys.findIndex(k => k === e.key.toUpperCase());
         if (idx !== -1) {
-            handleAnswer(idx, true);
+            playNote(idx);
+            if (canAnswer) {
+                handleAnswer(idx, true);
+            }
         }
     });
     // 动画绘制
